@@ -1,67 +1,214 @@
 package controle;
 
-import entidades.Usuario;
-import entidades.Curso;
 import arquivos.ArquivoCursos;
-import visao.VisaoCurso;
+import entidades.Curso;
+import entidades.Usuario;
+import utils.Entrada;
 import utils.GeradorCodigo;
+import visao.VisaoCurso;
 
 import java.util.List;
-import java.util.*;
 
 public class ControleCurso {
 
-    // acesso aos dados de cursos
-    private ArquivoCursos arq = new ArquivoCursos();
+    private final ArquivoCursos arq;
+    private final VisaoCurso visao;
 
-    // interface
-    private VisaoCurso visao = new VisaoCurso();
+    public ControleCurso() {
+        this.arq = new ArquivoCursos();
+        this.visao = new VisaoCurso();
+    }
 
-    // menu principal de cursos
-    public void menu(Usuario u) {
+    public void menu(Usuario usuario) {
+        while (true) {
+            System.out.println("\n> Inicio > Meus cursos");
 
-        java.util.Scanner sc = new java.util.Scanner(System.in);
-
-        while(true) {
-
-            // lista cursos do usuario
-            List<Curso> lista = arq.listarPorUsuario(u.getId());
-
+            List<Curso> lista = arq.listarPorUsuario(usuario.getId());
             visao.listarCursos(lista);
 
-            System.out.println("(a) novo curso");
-            System.out.println("(r) voltar");
+            System.out.println("\n(A) Novo curso");
+            System.out.println("(R) Retornar ao menu anterior");
+            System.out.print("\nOpcao: ");
 
-            String op = sc.nextLine();
+            String opcao = Entrada.SCANNER.nextLine().trim();
 
-            // cria curso
-            if(op.equalsIgnoreCase("a"))
-                criar(u);
+            if (opcao.equalsIgnoreCase("A")) {
+                criar(usuario);
+                continue;
+            }
 
-            // volta para menu anterior
-            else if(op.equalsIgnoreCase("r"))
+            if (opcao.equalsIgnoreCase("R")) {
                 break;
+            }
+
+            Integer indiceEscolhido = parseIndice(opcao);
+
+            if (indiceEscolhido == null || indiceEscolhido < 1 || indiceEscolhido > lista.size()) {
+                System.out.println("Opcao invalida.");
+                continue;
+            }
+
+            Curso cursoSelecionado = lista.get(indiceEscolhido - 1);
+            menuCurso(cursoSelecionado.getId());
         }
     }
 
-    // cria novo curso
-    public void criar(Usuario u) {
+    public void criar(Usuario usuario) {
+        Curso curso = visao.leCurso();
 
-        // le dados do curso
-        Curso c = visao.leCurso();
+        if (curso.getNome() == null || curso.getNome().isBlank()) {
+            System.out.println("Nome do curso e obrigatorio.");
+            return;
+        }
 
-        // define usuario dono
-        c.setIdUsuario(u.getId());
+        if (curso.getDataInicio() == null || curso.getDataInicio().isBlank()) {
+            System.out.println("Data de inicio e obrigatoria.");
+            return;
+        }
 
-        // gera codigo unico
-        c.setCodigo(GeradorCodigo.gerar());
+        curso.setIdUsuario(usuario.getId());
+        curso.setCodigo(gerarCodigoUnico());
+        curso.setEstado(0);
 
-        // define estado inicial
-        c.setEstado(0);
+        int id = arq.create(curso);
 
-        // salva curso
-        arq.create(c);
+        if (id < 0) {
+            System.out.println("Falha ao criar curso.");
+            return;
+        }
 
-        System.out.println("curso criado");
+        System.out.println("Curso criado com sucesso. ID: " + id);
+    }
+
+    private void menuCurso(int idCurso) {
+        while (true) {
+            Curso curso = arq.read(idCurso);
+
+            if (curso == null) {
+                System.out.println("Curso nao encontrado.");
+                return;
+            }
+
+            System.out.println("\n> Inicio > Meus cursos > " + curso.getNome());
+            visao.mostrarCurso(curso);
+
+            System.out.println("\n(A) Gerenciar inscritos no curso");
+            System.out.println("(B) Corrigir dados do curso");
+            System.out.println("(C) Encerrar inscricoes");
+            System.out.println("(D) Concluir curso");
+            System.out.println("(E) Cancelar curso");
+            System.out.println("(R) Retornar ao menu anterior");
+            System.out.print("\nOpcao: ");
+
+            String opcao = Entrada.SCANNER.nextLine().trim();
+
+            if (opcao.equalsIgnoreCase("A")) {
+                System.out.println("Gerenciamento de inscritos sera implementado no TP2.");
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("B")) {
+                corrigirDados(curso);
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("C")) {
+                encerrarInscricoes(curso);
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("D")) {
+                concluirCurso(curso);
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("E")) {
+                cancelarCurso(curso);
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("R")) {
+                return;
+            }
+
+            System.out.println("Opcao invalida.");
+        }
+    }
+
+    private void corrigirDados(Curso cursoAtual) {
+        Curso editado = visao.leCursoParaAtualizacao(cursoAtual);
+
+        if (editado.getNome() == null || editado.getNome().isBlank()) {
+            System.out.println("Nome do curso nao pode ficar em branco.");
+            return;
+        }
+
+        if (!arq.update(editado)) {
+            System.out.println("Nao foi possivel atualizar os dados do curso.");
+            return;
+        }
+
+        System.out.println("Curso atualizado com sucesso.");
+    }
+
+    private void encerrarInscricoes(Curso curso) {
+        if (curso.getEstado() != 0) {
+            System.out.println("Somente cursos em estado ativo (0) podem encerrar inscricoes.");
+            return;
+        }
+
+        curso.setEstado(1);
+        arq.update(curso);
+        System.out.println("Inscricoes encerradas.");
+    }
+
+    private void concluirCurso(Curso curso) {
+        if (curso.getEstado() == 3) {
+            System.out.println("Curso cancelado nao pode ser concluido.");
+            return;
+        }
+
+        curso.setEstado(2);
+        arq.update(curso);
+        System.out.println("Curso concluido.");
+    }
+
+    private void cancelarCurso(Curso curso) {
+        if (curso.getEstado() == 2) {
+            System.out.println("Curso concluido nao pode ser cancelado.");
+            return;
+        }
+
+        curso.setEstado(3);
+        arq.update(curso);
+        System.out.println("Curso marcado como cancelado.");
+    }
+
+    private String gerarCodigoUnico() {
+        String codigo;
+
+        do {
+            codigo = GeradorCodigo.gerar();
+        } while (codigoExiste(codigo));
+
+        return codigo;
+    }
+
+    private boolean codigoExiste(String codigo) {
+        for (Curso curso : arq.listarTodos()) {
+            if (curso.getCodigo().equals(codigo)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Integer parseIndice(String valor) {
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

@@ -1,86 +1,203 @@
 package arquivos;
 
 import entidades.Curso;
+import estruturas.ArquivoIndexado;
+import estruturas.ArvoreBMais;
+import estruturas.TabelaHashExtensivel;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
-public class ArquivoCursos {
+public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
-    // armazenamento id -> curso
-    private HashMap<Integer, Curso> dados;
+    private static final String ARQ_DADOS = "dados/cursos.db";
+    private static final String ARQ_INDICE_DIRETO = "dados/cursosId.hash";
+    private static final String ARQ_REL_USUARIO_CURSO = "dados/usuarioCurso.idx";
+    private static final String ARQ_INDICE_CODIGO = "dados/cursoCodigo.hash";
 
-    // relacionamento usuario -> lista de cursos
-    private HashMap<Integer, List<Integer>> usuarioCursos;
-
-    private int proximoId;
+    private final TabelaHashExtensivel<Integer, Integer> indiceDireto;
+    private final TabelaHashExtensivel<String, Integer> indiceCodigo;
+    private final ArvoreBMais<Integer, Integer> indiceUsuarioCurso;
 
     public ArquivoCursos() {
-        dados = new HashMap<>();
-        usuarioCursos = new HashMap<>();
-        proximoId = 1;
+        super(ARQ_DADOS, Curso::new);
+        indiceDireto = new TabelaHashExtensivel<>(ARQ_INDICE_DIRETO);
+        indiceCodigo = new TabelaHashExtensivel<>(ARQ_INDICE_CODIGO);
+        indiceUsuarioCurso = new ArvoreBMais<>(ARQ_REL_USUARIO_CURSO);
+        reconstruirIndices();
     }
 
-    // cria curso
-    public int create(Curso c) {
+    @Override
+    public int create(Curso curso) {
+        String codigo = normalizarCodigo(curso.getCodigo());
 
-        c.setId(proximoId);
+        if (!codigo.isEmpty() && indiceCodigo.read(codigo) != null) {
+            return -1;
+        }
 
-        dados.put(proximoId, c);
+        curso.setCodigo(codigo);
 
-        // adiciona no relacionamento usuario -> cursos
-        usuarioCursos
-            .computeIfAbsent(c.getIdUsuario(), k -> new ArrayList<>())
-            .add(proximoId);
+        int id = super.create(curso);
 
-        return proximoId++;
+        indiceDireto.upsert(id, id);
+        indiceUsuarioCurso.create(curso.getIdUsuario(), id);
+
+        if (!codigo.isEmpty()) {
+            indiceCodigo.upsert(codigo, id);
+        }
+
+        return id;
     }
 
-    // le curso
+    @Override
     public Curso read(int id) {
-        return dados.get(id);
+        Integer idArmazenado = indiceDireto.read(id);
+
+        if (idArmazenado == null) {
+            return null;
+        }
+
+        return super.read(idArmazenado);
     }
 
-    // atualiza curso
-    public boolean update(Curso c) {
+    @Override
+    public boolean update(Curso curso) {
+        Curso antigo = super.read(curso.getId());
 
-        if(!dados.containsKey(c.getId()))
+        if (antigo == null) {
             return false;
+        }
 
-        dados.put(c.getId(), c);
+        String novoCodigo = normalizarCodigo(curso.getCodigo());
+        Integer idDonoCodigo = indiceCodigo.read(novoCodigo);
+
+        if (!novoCodigo.isEmpty() && idDonoCodigo != null && idDonoCodigo != curso.getId()) {
+            return false;
+        }
+
+        curso.setCodigo(novoCodigo);
+
+        boolean ok = super.update(curso);
+
+        if (!ok) {
+            return false;
+        }
+
+        indiceDireto.upsert(curso.getId(), curso.getId());
+
+        if (antigo.getIdUsuario() != curso.getIdUsuario()) {
+            indiceUsuarioCurso.delete(antigo.getIdUsuario(), curso.getId());
+            indiceUsuarioCurso.create(curso.getIdUsuario(), curso.getId());
+        }
+
+        String codigoAntigo = normalizarCodigo(antigo.getCodigo());
+
+        if (!codigoAntigo.equals(novoCodigo)) {
+            if (!codigoAntigo.isEmpty()) {
+                indiceCodigo.delete(codigoAntigo);
+            }
+
+            if (!novoCodigo.isEmpty()) {
+                indiceCodigo.upsert(novoCodigo, curso.getId());
+            }
+        }
+
         return true;
     }
 
-    // exclui curso
+    @Override
     public boolean delete(int id) {
+        Curso curso = read(id);
 
-        Curso c = dados.remove(id);
+        if (curso == null) {
+            return false;
+        }
 
-        if(c != null) {
+        boolean ok = super.delete(id);
 
-            List<Integer> lista = usuarioCursos.get(c.getIdUsuario());
+        if (!ok) {
+            return false;
+        }
 
-            if(lista != null)
-                lista.remove(Integer.valueOf(id));
+        indiceDireto.delete(id);
+        indiceUsuarioCurso.delete(curso.getIdUsuario(), id);
 
-            return true;
+        String codigo = normalizarCodigo(curso.getCodigo());
+        if (!codigo.isEmpty()) {
+            indiceCodigo.delete(codigo);
+        }
+
+        return true;
+    }
+
+    public List<Curso> listarPorUsuario(int idUsuario) {
+        ArrayList<Integer> idsCursos = indiceUsuarioCurso.read(idUsuario);
+        List<Curso> cursos = new ArrayList<>();
+
+        for (Integer idCurso : idsCursos) {
+            Curso curso = super.read(idCurso);
+
+            if (curso != null) {
+                cursos.add(curso);
+            }
+        }
+
+        cursos.sort(Comparator.comparing(curso -> texto(curso.getNome()), String.CASE_INSENSITIVE_ORDER));
+        return cursos;
+    }
+
+    public boolean temCursosAtivosPorUsuario(int idUsuario) {
+        for (Curso curso : listarPorUsuario(idUsuario)) {
+            if (curso.getEstado() == 0 || curso.getEstado() == 1) {
+                return true;
+            }
         }
 
         return false;
     }
 
-    // lista cursos de um usuario
-    public List<Curso> listarPorUsuario(int idUsuario) {
+    public void removerInativosDoUsuario(int idUsuario) {
+        List<Curso> cursos = listarPorUsuario(idUsuario);
 
-        List<Curso> listaCursos = new ArrayList<>();
-
-        List<Integer> ids = usuarioCursos.get(idUsuario);
-
-        if(ids != null) {
-            for(int id : ids) {
-                listaCursos.add(dados.get(id));
+        for (Curso curso : cursos) {
+            if (curso.getEstado() == 2 || curso.getEstado() == 3) {
+                delete(curso.getId());
             }
         }
+    }
 
-        return listaCursos;
+    public List<Curso> listarTodos() {
+        List<Curso> cursos = super.readAll();
+        cursos.sort(Comparator.comparing(curso -> texto(curso.getNome()), String.CASE_INSENSITIVE_ORDER));
+        return cursos;
+    }
+
+    private void reconstruirIndices() {
+        indiceDireto.clear();
+        indiceCodigo.clear();
+        indiceUsuarioCurso.clear();
+
+        for (Curso curso : super.readAll()) {
+            indiceDireto.upsert(curso.getId(), curso.getId());
+            indiceUsuarioCurso.create(curso.getIdUsuario(), curso.getId());
+
+            String codigo = normalizarCodigo(curso.getCodigo());
+            if (!codigo.isEmpty()) {
+                indiceCodigo.upsert(codigo, curso.getId());
+            }
+        }
+    }
+
+    private String normalizarCodigo(String codigo) {
+        if (codigo == null) {
+            return "";
+        }
+
+        return codigo.trim();
+    }
+
+    private String texto(String valor) {
+        return valor == null ? "" : valor;
     }
 }
