@@ -1,51 +1,157 @@
 package controle;
 
-import entidades.Usuario;
+import arquivos.ArquivoCursos;
 import arquivos.ArquivoUsuarios;
-import visao.VisaoUsuario;
+import entidades.Usuario;
+import utils.Entrada;
 import utils.HashSenha;
-
-import java.util.*;
+import visao.VisaoUsuario;
 
 public class ControleUsuario {
 
-    // acesso aos dados de usuario
-    private ArquivoUsuarios arq = new ArquivoUsuarios();
+    private final ArquivoUsuarios arqUsuarios;
+    private final ArquivoCursos arqCursos;
+    private final VisaoUsuario visao;
 
-    // interface de entrada e saida
-    private VisaoUsuario visao = new VisaoUsuario();
-
-    // cadastra novo usuario
-    public void cadastrar() {
-
-        // le dados digitados
-        Usuario u = visao.leUsuario();
-
-        // gera o hash da senha
-        u.setHashSenha(HashSenha.hash(u.getHashSenha()));
-
-        // salva usuario
-        arq.create(u);
-
-        System.out.println("usuario cadastrado");
+    public ControleUsuario() {
+        this.arqUsuarios = new ArquivoUsuarios();
+        this.arqCursos = new ArquivoCursos();
+        this.visao = new VisaoUsuario();
     }
 
-    // realiza login
-    public Usuario login() {
+    public void cadastrar() {
+        Usuario usuario = visao.leUsuario();
 
-        // le email e senha
-        String[] dados = visao.leLogin();
-
-        // busca usuario pelo email
-        Usuario u = arq.buscarEmail(dados[0]);
-
-        // compara hash da senha
-        if(u != null && u.getHashSenha().equals(HashSenha.hash(dados[1]))) {
-            System.out.println("login ok");
-            return u;
+        if (!dadosObrigatoriosPreenchidos(usuario)) {
+            System.out.println("Cadastro invalido: preencha todos os campos.");
+            return;
         }
 
-        System.out.println("login invalido");
-        return null;
+        usuario.setHashSenha(HashSenha.hash(usuario.getHashSenha()));
+        usuario.setHashRespostaSecreta(HashSenha.hash(usuario.getHashRespostaSecreta()));
+
+        int id = arqUsuarios.create(usuario);
+
+        if (id < 0) {
+            System.out.println("E-mail ja cadastrado.");
+            return;
+        }
+
+        System.out.println("Usuario cadastrado com sucesso. ID: " + id);
+    }
+
+    public Usuario login() {
+        String[] dados = visao.leLogin();
+        Usuario usuario = arqUsuarios.buscarPorEmail(dados[0]);
+
+        if (usuario == null) {
+            System.out.println("Login invalido.");
+            return null;
+        }
+
+        String hashInformado = HashSenha.hash(dados[1]);
+
+        if (!hashInformado.equals(usuario.getHashSenha())) {
+            System.out.println("Login invalido.");
+            return null;
+        }
+
+        System.out.println("Login realizado com sucesso.");
+        return usuario;
+    }
+
+    public Usuario menuMeusDados(Usuario logado) {
+        while (true) {
+            System.out.println("\n> Inicio > Meus dados");
+            visao.mostraUsuario(logado);
+
+            System.out.println("\n(A) Corrigir meus dados");
+            System.out.println("(B) Excluir meu usuario");
+            System.out.println("(R) Retornar ao menu anterior");
+            System.out.print("\nOpcao: ");
+
+            String opcao = Entrada.SCANNER.nextLine().trim();
+
+            if (opcao.equalsIgnoreCase("A")) {
+                logado = atualizarDados(logado);
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("B")) {
+                boolean excluiu = excluirUsuario(logado);
+
+                if (excluiu) {
+                    return null;
+                }
+
+                continue;
+            }
+
+            if (opcao.equalsIgnoreCase("R")) {
+                return logado;
+            }
+
+            System.out.println("Opcao invalida.");
+        }
+    }
+
+    private Usuario atualizarDados(Usuario atual) {
+        Usuario editado = visao.leUsuarioParaAtualizacao(atual);
+
+        if (editado.getHashSenha() == null || editado.getHashSenha().isBlank()) {
+            editado.setHashSenha(atual.getHashSenha());
+        } else {
+            editado.setHashSenha(HashSenha.hash(editado.getHashSenha()));
+        }
+
+        if (editado.getHashRespostaSecreta() == null || editado.getHashRespostaSecreta().isBlank()) {
+            editado.setHashRespostaSecreta(atual.getHashRespostaSecreta());
+        } else {
+            editado.setHashRespostaSecreta(HashSenha.hash(editado.getHashRespostaSecreta()));
+        }
+
+        if (!arqUsuarios.update(editado)) {
+            System.out.println("Nao foi possivel atualizar. Verifique se o e-mail ja existe.");
+            return atual;
+        }
+
+        Usuario atualizado = arqUsuarios.read(atual.getId());
+        System.out.println("Dados atualizados com sucesso.");
+
+        if (atualizado == null) {
+            return atual;
+        }
+
+        return atualizado;
+    }
+
+    private boolean excluirUsuario(Usuario usuario) {
+        if (arqCursos.temCursosAtivosPorUsuario(usuario.getId())) {
+            System.out.println("Nao e possivel excluir: ha cursos ativos vinculados ao usuario.");
+            return false;
+        }
+
+        arqCursos.removerInativosDoUsuario(usuario.getId());
+
+        if (!arqUsuarios.delete(usuario.getId())) {
+            System.out.println("Falha ao excluir usuario.");
+            return false;
+        }
+
+        System.out.println("Usuario excluido com sucesso.");
+        return true;
+    }
+
+    private boolean dadosObrigatoriosPreenchidos(Usuario usuario) {
+        return usuario.getNome() != null
+            && !usuario.getNome().isBlank()
+            && usuario.getEmail() != null
+            && !usuario.getEmail().isBlank()
+            && usuario.getHashSenha() != null
+            && !usuario.getHashSenha().isBlank()
+            && usuario.getPerguntaSecreta() != null
+            && !usuario.getPerguntaSecreta().isBlank()
+            && usuario.getHashRespostaSecreta() != null
+            && !usuario.getHashRespostaSecreta().isBlank();
     }
 }

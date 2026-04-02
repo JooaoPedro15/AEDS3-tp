@@ -1,77 +1,142 @@
 package arquivos;
 
 import entidades.Usuario;
-import java.util.HashMap;
+import estruturas.ArquivoIndexado;
+import estruturas.TabelaHashExtensivel;
 
-public class ArquivoUsuarios {
+import java.util.List;
 
-    // simula armazenamento em memoria id -> usuario
-    private HashMap<Integer, Usuario> dados;
+public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
 
-    // indice por email
-    private HashMap<String, Integer> indiceEmail;
+    private static final String ARQ_DADOS = "dados/usuarios.db";
+    private static final String ARQ_INDICE_DIRETO = "dados/usuariosId.hash";
+    private static final String ARQ_INDICE_EMAIL = "dados/email.hash";
 
-    private int proximoId;
+    private final TabelaHashExtensivel<Integer, Integer> indiceDireto;
+    private final TabelaHashExtensivel<String, Integer> indiceEmail;
 
     public ArquivoUsuarios() {
-        dados = new HashMap<>();
-        indiceEmail = new HashMap<>();
-        proximoId = 1;
+        super(ARQ_DADOS, Usuario::new);
+        indiceDireto = new TabelaHashExtensivel<>(ARQ_INDICE_DIRETO);
+        indiceEmail = new TabelaHashExtensivel<>(ARQ_INDICE_EMAIL);
+        reconstruirIndices();
     }
 
-    // cria usuario
-    public int create(Usuario u) {
+    @Override
+    public int create(Usuario usuario) {
+        String email = normalizarEmail(usuario.getEmail());
 
-        u.setId(proximoId);
+        if (indiceEmail.read(email) != null) {
+            return -1;
+        }
 
-        dados.put(proximoId, u);
+        usuario.setEmail(email);
+        int id = super.create(usuario);
 
-        // atualiza indice por email
-        indiceEmail.put(u.getEmail(), proximoId);
+        indiceDireto.upsert(id, id);
+        indiceEmail.upsert(email, id);
 
-        return proximoId++;
+        return id;
     }
 
-    // busca por id
+    @Override
     public Usuario read(int id) {
-        return dados.get(id);
+        Integer idArmazenado = indiceDireto.read(id);
+
+        if (idArmazenado == null) {
+            return null;
+        }
+
+        return super.read(idArmazenado);
     }
 
-    // busca por email (usado no login)
     public Usuario buscarPorEmail(String email) {
+        Integer id = indiceEmail.read(normalizarEmail(email));
 
-        Integer id = indiceEmail.get(email);
+        if (id == null) {
+            return null;
+        }
 
-        if(id != null)
-            return dados.get(id);
-
-        return null;
+        return super.read(id);
     }
 
-    // atualiza usuario
-    public boolean update(Usuario u) {
+    // Compatibilidade com chamadas antigas.
+    public Usuario buscarEmail(String email) {
+        return buscarPorEmail(email);
+    }
 
-        if(!dados.containsKey(u.getId()))
+    @Override
+    public boolean update(Usuario usuario) {
+        Usuario antigo = super.read(usuario.getId());
+
+        if (antigo == null) {
             return false;
+        }
 
-        dados.put(u.getId(), u);
+        String novoEmail = normalizarEmail(usuario.getEmail());
+        Integer idDonoEmail = indiceEmail.read(novoEmail);
 
-        // atualiza indice email
-        indiceEmail.put(u.getEmail(), u.getId());
+        if (idDonoEmail != null && idDonoEmail != usuario.getId()) {
+            return false;
+        }
 
+        usuario.setEmail(novoEmail);
+
+        boolean ok = super.update(usuario);
+
+        if (!ok) {
+            return false;
+        }
+
+        indiceDireto.upsert(usuario.getId(), usuario.getId());
+
+        String emailAntigo = normalizarEmail(antigo.getEmail());
+        if (!emailAntigo.equals(novoEmail)) {
+            indiceEmail.delete(emailAntigo);
+        }
+
+        indiceEmail.upsert(novoEmail, usuario.getId());
         return true;
     }
 
-    // exclui usuario
+    @Override
     public boolean delete(int id) {
+        Usuario usuario = read(id);
 
-        Usuario u = dados.remove(id);
-
-        if(u != null) {
-            indiceEmail.remove(u.getEmail());
-            return true;
+        if (usuario == null) {
+            return false;
         }
 
-        return false;
+        boolean ok = super.delete(id);
+
+        if (!ok) {
+            return false;
+        }
+
+        indiceDireto.delete(id);
+        indiceEmail.delete(normalizarEmail(usuario.getEmail()));
+        return true;
+    }
+
+    public List<Usuario> listarTodos() {
+        return super.readAll();
+    }
+
+    private void reconstruirIndices() {
+        indiceDireto.clear();
+        indiceEmail.clear();
+
+        for (Usuario usuario : super.readAll()) {
+            indiceDireto.upsert(usuario.getId(), usuario.getId());
+            indiceEmail.upsert(normalizarEmail(usuario.getEmail()), usuario.getId());
+        }
+    }
+
+    private String normalizarEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+
+        return email.trim().toLowerCase();
     }
 }

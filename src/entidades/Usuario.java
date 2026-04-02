@@ -1,117 +1,139 @@
 package entidades;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
-public class Usuario {
+public class Usuario implements Registro {
 
-    // atributo que guarda o id unico do usuario
     private int id;
-
-    // nome do usuario
     private String nome;
-
-    // email usado para login
     private String email;
-
-    // hash da senha nao armazenamos a senha real
     private String hashSenha;
-
-    // pergunta usada para recuperar senha
     private String perguntaSecreta;
+    private String hashRespostaSecreta;
 
-    // resposta da pergunta secreta
-    private String respostaSecreta;
-
-    // construtor vazio usado ao ler dados do arquivo
     public Usuario() {
-        // inicializa id com valor invalido
-        this.id = -1;
+        this(-1, "", "", "", "", "");
     }
 
-    // construtor usado ao criar um novo usuario
-    public Usuario(String nome, String email, String hashSenha,
-                   String perguntaSecreta, String respostaSecreta) {
+    public Usuario(
+        String nome,
+        String email,
+        String hashSenha,
+        String perguntaSecreta,
+        String hashRespostaSecreta
+    ) {
+        this(-1, nome, email, hashSenha, perguntaSecreta, hashRespostaSecreta);
+    }
 
-        // atribui os valores recebidos aos atributos
+    public Usuario(
+        int id,
+        String nome,
+        String email,
+        String hashSenha,
+        String perguntaSecreta,
+        String hashRespostaSecreta
+    ) {
+        this.id = id;
         this.nome = nome;
         this.email = email;
         this.hashSenha = hashSenha;
         this.perguntaSecreta = perguntaSecreta;
-        this.respostaSecreta = respostaSecreta;
+        this.hashRespostaSecreta = hashRespostaSecreta;
     }
 
-    // retorna o id do usuario
-    public int getId() { return id; }
+    @Override
+    public int getId() {
+        return id;
+    }
 
-    // define o id do usuario
-    public void setId(int id) { this.id = id; }
+    @Override
+    public void setId(int id) {
+        this.id = id;
+    }
 
-    // retorna o nome
-    public String getNome() { return nome; }
+    public String getNome() {
+        return nome;
+    }
 
-    // define o nome
-    public void setNome(String nome) { this.nome = nome; }
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
 
-    // retorna o email
-    public String getEmail() { return email; }
+    public String getEmail() {
+        return email;
+    }
 
-    // define o email
-    public void setEmail(String email) { this.email = email; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-    // retorna o hash da senha
-    public String getHashSenha() { return hashSenha; }
+    public String getHashSenha() {
+        return hashSenha;
+    }
 
-    // define o hash da senha
-    public void setHashSenha(String hashSenha) { this.hashSenha = hashSenha; }
+    public void setHashSenha(String hashSenha) {
+        this.hashSenha = hashSenha;
+    }
 
-    // retorna a pergunta secreta
-    public String getPerguntaSecreta() { return perguntaSecreta; }
+    public String getPerguntaSecreta() {
+        return perguntaSecreta;
+    }
 
-    // define a pergunta secreta
-    public void setPerguntaSecreta(String perguntaSecreta) { this.perguntaSecreta = perguntaSecreta; }
+    public void setPerguntaSecreta(String perguntaSecreta) {
+        this.perguntaSecreta = perguntaSecreta;
+    }
 
-    // retorna a resposta secreta
-    public String getRespostaSecreta() { return respostaSecreta; }
+    public String getHashRespostaSecreta() {
+        return hashRespostaSecreta;
+    }
 
-    // define a resposta secreta
-    public void setRespostaSecreta(String respostaSecreta) { this.respostaSecreta = respostaSecreta; }
+    public void setHashRespostaSecreta(String hashRespostaSecreta) {
+        this.hashRespostaSecreta = hashRespostaSecreta;
+    }
 
-    // metodo que transforma o objeto em vetor de bytes para salvar no arquivo
+    // Compatibilidade com o nome antigo.
+    public String getRespostaSecreta() {
+        return hashRespostaSecreta;
+    }
+
+    // Compatibilidade com o nome antigo.
+    public void setRespostaSecreta(String respostaSecreta) {
+        this.hashRespostaSecreta = respostaSecreta;
+    }
+
+    @Override
     public byte[] toByteArray() throws IOException {
-
-        // cria um fluxo de bytes em memoria
         ByteArrayOutputStream ba = new ByteArrayOutputStream();
-
-        // permite escrever dados primitivos no fluxo
         DataOutputStream da = new DataOutputStream(ba);
 
-        // escreve cada atributo na mesma ordem
         da.writeInt(id);
-        da.writeUTF(nome);
-        da.writeUTF(email);
-        da.writeUTF(hashSenha);
-        da.writeUTF(perguntaSecreta);
-        da.writeUTF(respostaSecreta);
+        da.writeUTF(valorOuVazio(nome));
+        da.writeUTF(valorOuVazio(email));
+        da.writeUTF(valorOuVazio(hashSenha));
+        da.writeUTF(valorOuVazio(perguntaSecreta));
+        da.writeUTF(valorOuVazio(hashRespostaSecreta));
 
-        // retorna o vetor de bytes gerado
         return ba.toByteArray();
     }
 
-    // metodo que reconstrói o objeto a partir de um vetor de bytes
+    @Override
     public void fromByteArray(byte[] ba) throws IOException {
-
-        // cria um fluxo de leitura a partir do vetor de bytes
         ByteArrayInputStream bi = new ByteArrayInputStream(ba);
-
-        // permite ler dados primitivos do fluxo
         DataInputStream di = new DataInputStream(bi);
 
-        // le os dados na mesma ordem em que foram gravados
         id = di.readInt();
         nome = di.readUTF();
         email = di.readUTF();
         hashSenha = di.readUTF();
         perguntaSecreta = di.readUTF();
-        respostaSecreta = di.readUTF();
+        hashRespostaSecreta = di.readUTF();
+    }
+
+    private String valorOuVazio(String valor) {
+        return valor == null ? "" : valor;
     }
 }
