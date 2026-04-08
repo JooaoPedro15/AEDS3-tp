@@ -12,12 +12,10 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
     private static final String ARQ_INDICE_DIRETO = "dados/usuariosId.hash";
     private static final String ARQ_INDICE_EMAIL = "dados/email.hash";
 
-    private final TabelaHashExtensivel<Integer, Integer> indiceDireto;
     private final TabelaHashExtensivel<String, Integer> indiceEmail;
 
     public ArquivoUsuarios() {
-        super(ARQ_DADOS, Usuario::new);
-        indiceDireto = new TabelaHashExtensivel<>(ARQ_INDICE_DIRETO);
+        super(ARQ_DADOS, ARQ_INDICE_DIRETO, Usuario::new);
         indiceEmail = new TabelaHashExtensivel<>(ARQ_INDICE_EMAIL);
         reconstruirIndices();
     }
@@ -33,21 +31,9 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
         usuario.setEmail(email);
         int id = super.create(usuario);
 
-        indiceDireto.upsert(id, id);
         indiceEmail.upsert(email, id);
 
         return id;
-    }
-
-    @Override
-    public Usuario read(int id) {
-        Integer idArmazenado = indiceDireto.read(id);
-
-        if (idArmazenado == null) {
-            return null;
-        }
-
-        return super.read(idArmazenado);
     }
 
     public Usuario buscarPorEmail(String email) {
@@ -57,7 +43,7 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
             return null;
         }
 
-        return super.read(id);
+        return read(id);
     }
 
     // Compatibilidade com chamadas antigas.
@@ -88,8 +74,6 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
             return false;
         }
 
-        indiceDireto.upsert(usuario.getId(), usuario.getId());
-
         String emailAntigo = normalizarEmail(antigo.getEmail());
         if (!emailAntigo.equals(novoEmail)) {
             indiceEmail.delete(emailAntigo);
@@ -113,7 +97,6 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
             return false;
         }
 
-        indiceDireto.delete(id);
         indiceEmail.delete(normalizarEmail(usuario.getEmail()));
         return true;
     }
@@ -123,11 +106,9 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
     }
 
     private void reconstruirIndices() {
-        indiceDireto.clear();
         indiceEmail.clear();
 
         for (Usuario usuario : super.readAll()) {
-            indiceDireto.upsert(usuario.getId(), usuario.getId());
             indiceEmail.upsert(normalizarEmail(usuario.getEmail()), usuario.getId());
         }
     }

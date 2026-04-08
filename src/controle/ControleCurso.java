@@ -212,13 +212,7 @@ public class ControleCurso {
     }
 
     private boolean codigoExiste(String codigo) {
-        for (Curso curso : arq.listarTodos()) {
-            if (curso.getCodigo().equals(codigo)) {
-                return true;
-            }
-        }
-
-        return false;
+        return arq.buscarPorCodigo(codigo) != null;
     }
 
     private Integer parseIndice(String valor) {

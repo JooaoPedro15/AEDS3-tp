@@ -17,17 +17,15 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
     private static final String ARQ_INDICE_CODIGO = "dados/cursoCodigo.hash";
     private static final String ARQ_INDICE_NOME = "dados/cursosNome.idx";
 
-    private final TabelaHashExtensivel<Integer, Integer> indiceDireto;
     private final TabelaHashExtensivel<String, Integer> indiceCodigo;
     private final ArvoreBMais<Integer, Integer> indiceUsuarioCurso;
     private final ArvoreBMais<String, Integer> indiceNome;
 
     public ArquivoCursos() {
-        super(ARQ_DADOS, Curso::new);
-        indiceDireto = new TabelaHashExtensivel<>(ARQ_INDICE_DIRETO);
+        super(ARQ_DADOS, ARQ_INDICE_DIRETO, Curso::new);
         indiceCodigo = new TabelaHashExtensivel<>(ARQ_INDICE_CODIGO);
         indiceUsuarioCurso = new ArvoreBMais<>(ARQ_REL_USUARIO_CURSO);
-        indiceNome = new ArvoreBMais<>(ARQ_INDICE_NOME); //arquivo com par nome-id
+        indiceNome = new ArvoreBMais<>(ARQ_INDICE_NOME);
         reconstruirIndices();
     }
 
@@ -43,7 +41,6 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
         int id = super.create(curso);
 
-        indiceDireto.upsert(id, id);
         indiceUsuarioCurso.create(curso.getIdUsuario(), id);
         indiceNome.create(curso.getNome(), id);
 
@@ -52,17 +49,6 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
         }
 
         return id;
-    }
-
-    @Override
-    public Curso read(int id) {
-        Integer idArmazenado = indiceDireto.read(id);
-
-        if (idArmazenado == null) {
-            return null;
-        }
-
-        return super.read(idArmazenado);
     }
 
     @Override
@@ -88,14 +74,12 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
             return false;
         }
 
-        indiceDireto.upsert(curso.getId(), curso.getId());
-
         if (antigo.getIdUsuario() != curso.getIdUsuario()) {
             indiceUsuarioCurso.delete(antigo.getIdUsuario(), curso.getId());
             indiceUsuarioCurso.create(curso.getIdUsuario(), curso.getId());
         }
 
-        if(!antigo.getNome().equals(curso.getNome())){
+        if (!antigo.getNome().equals(curso.getNome())) {
             indiceNome.delete(antigo.getNome(), antigo.getId());
             indiceNome.create(curso.getNome(), curso.getId());
         }
@@ -129,9 +113,8 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
             return false;
         }
 
-        indiceDireto.delete(id);
         indiceUsuarioCurso.delete(curso.getIdUsuario(), id);
-        indiceNome.delete(curso.getNome(), id); 
+        indiceNome.delete(curso.getNome(), id);
 
         String codigo = normalizarCodigo(curso.getCodigo());
         if (!codigo.isEmpty()) {
@@ -143,17 +126,17 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
     public List<Curso> listarPorUsuario(int idUsuario) {
         List<Curso> cursos = new ArrayList<>();
+        ArrayList<Integer> ids = indiceUsuarioCurso.read(idUsuario);
 
-        for(ArrayList<Integer> ids: indiceNome.snapshot().values()){
-            for(Integer id: ids){
-                Curso curso = super.read(id);
-                //filtra cursos do usuario logado
-                if(curso != null && curso.getIdUsuario() == idUsuario){
-                    cursos.add(curso);
-                }
+        for (Integer id : ids) {
+            Curso curso = read(id);
+
+            if (curso != null) {
+                cursos.add(curso);
             }
         }
 
+        cursos.sort(Comparator.comparing(curso -> texto(curso.getNome()), String.CASE_INSENSITIVE_ORDER));
         return cursos;
     }
 
@@ -178,19 +161,32 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
     }
 
     public List<Curso> listarTodos() {
-        List<Curso> cursos = super.readAll();
-        cursos.sort(Comparator.comparing(curso -> texto(curso.getNome()), String.CASE_INSENSITIVE_ORDER));
+        List<Curso> cursos = new ArrayList<>();
+
+        for (ArrayList<Integer> ids : indiceNome.snapshot().values()) {
+            for (Integer id : ids) {
+                Curso curso = read(id);
+
+                if (curso != null) {
+                    cursos.add(curso);
+                }
+            }
+        }
+
         return cursos;
     }
 
+    public Curso buscarPorCodigo(String codigo) {
+        Integer id = indiceCodigo.read(normalizarCodigo(codigo));
+        return id == null ? null : read(id);
+    }
+
     private void reconstruirIndices() {
-        indiceDireto.clear();
         indiceCodigo.clear();
         indiceUsuarioCurso.clear();
         indiceNome.clear();
 
         for (Curso curso : super.readAll()) {
-            indiceDireto.upsert(curso.getId(), curso.getId());
             indiceUsuarioCurso.create(curso.getIdUsuario(), curso.getId());
             indiceNome.create(curso.getNome(), curso.getId());
 

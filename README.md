@@ -1,4 +1,4 @@
-# TP1 – EntrePares 1.0
+# TP1 - EntrePares 1.0
 
 ## Integrantes
 
@@ -6,19 +6,24 @@
 - João Pedro
 - Maria Clara
 
----
+## 1. Descricao do sistema
 
-## 1. Descrição do Sistema
+O sistema EntrePares 1.0 permite:
 
-O sistema EntrePares 1.0 permite o cadastro de usuários e a criação de cursos livres ofertados por esses usuários.
+- cadastrar usuarios;
+- autenticar usuarios por e-mail e senha;
+- recuperar senha com pergunta secreta;
+- cadastrar cursos vinculados ao usuario logado;
+- alterar, concluir, encerrar inscricoes ou cancelar cursos;
+- listar os cursos do usuario ativo.
 
-Cada usuário pode criar vários cursos, e cada curso pertence a apenas um usuário, caracterizando um relacionamento do tipo 1:N.
+Neste TP1, o modulo de inscricoes ainda nao foi implementado. Por isso, a opcao "Minhas inscricoes" e o gerenciamento de inscritos no curso permanecem reservados para o TP2.
 
-Neste trabalho prático (TP1), foram implementadas as funcionalidades básicas de cadastro, autenticação e gerenciamento de cursos.
+## 2. Organizacao do projeto
 
----
+O projeto segue o padrao MVC, separando entidades, persistencia, controle e visao.
 
-## 2. Funcionalidades Implementadas
+### Classes principais
 
 ### Usuários
 
@@ -34,11 +39,16 @@ Neste trabalho prático (TP1), foram implementadas as funcionalidades básicas d
 - Geração de código compartilhável
 - Listagem de cursos do usuário
 
----
+### Usuario
 
-## 3. Estrutura do Projeto
+- `id`
+- `nome`
+- `email`
+- `hashSenha`
+- `perguntaSecreta`
+- `hashRespostaSecreta`
 
-O sistema foi organizado seguindo o padrão MVC:
+### Curso
 
 - entidades → classes Usuario e Curso
 - arquivos → simulação de persistência e CRUD
@@ -47,44 +57,36 @@ O sistema foi organizado seguindo o padrão MVC:
 - utils → funções auxiliares
 - estruturas → classes fornecidas
 
----
+Relacao implementada:
 
 ## 4. Modelagem de Dados
 
 Usuario (1) -------- (N) Curso
 
-Usuario
+## 4. Persistencia e indices
 
-- id
-- nome
-- email
-- hashSenha
-- perguntaSecreta
-- respostaSecreta
+### CRUD generico
 
-Curso
+A classe `ArquivoIndexado` foi implementada no modelo apresentado em sala:
 
-- id
-- idUsuario
-- nome
-- descricao
-- dataInicio
-- codigo
-- estado
+- cabecalho com ultimo ID e cabeca da lista de espacos livres;
+- registro com lapide, tamanho e vetor de bytes;
+- indice direto por hash extensivel apontando de `id` para o endereco do registro no arquivo;
+- reaproveitamento de espacos excluidos.
 
 Cada curso possui um atributo `idUsuario`, que representa o dono do curso.
 
----
+- indice indireto por e-mail com hash extensivel.
 
-## 5. Execução
+Operacoes especiais:
 
 1. Executar a classe `Main.java`
 2. Selecionar login ou cadastro
 3. Após login, acessar o menu de cursos
 
----
+### Indices de cursos
 
-## 6. Estruturas de Dados
+A classe `ArquivoCursos` estende `ArquivoIndexado<Curso>` e mantem:
 
 ### Índice por email
 
@@ -94,46 +96,100 @@ Foi utilizado um índice em memória (HashMap) para permitir a busca rápida de 
 
 O relacionamento 1:N foi implementado utilizando uma estrutura de associação em memória entre idUsuario e lista de cursos.
 
----
+- listagem dos cursos do usuario ativo;
+- ordenacao alfabetica dos cursos na exibicao do menu;
+- geracao automatica de codigo compartilhavel de 10 caracteres;
+- remocao automatica de cursos inativos quando um usuario e excluido.
 
-## 7. Checklist (respondido com base na implementação)
+## 5. Menus implementados
 
-Há um CRUD de usuários que estende ArquivoIndexado com índices?  
-Resposta: Não. Foi implementado um CRUD simplificado em memória utilizando HashMap.
+### Tela inicial
 
-Há um CRUD de cursos que estende ArquivoIndexado com índices?  
-Resposta: Não. Foi implementado um CRUD simplificado em memória.
+- login;
+- novo usuario;
+- recuperacao de senha;
+- sair.
 
-Os cursos estão vinculados aos usuários usando idUsuario?  
+### Menu principal do usuario logado
+
+- meus dados;
+- meus cursos;
+- minhas inscricoes (reservado para o TP2);
+- sair.
+
+### Menu de cursos
+
+- novo curso;
+- visualizar curso selecionado;
+- corrigir dados do curso;
+- encerrar inscricoes;
+- concluir curso;
+- cancelar curso;
+- gerenciar inscritos (reservado para o TP2).
+
+## 6. Regras de negocio implementadas
+
+- o login e feito por e-mail e senha com comparacao por hash;
+- a resposta secreta tambem e armazenada em hash;
+- um e-mail nao pode ser reutilizado por outro usuario;
+- um codigo compartilhavel nao pode ser reutilizado por outro curso;
+- todo curso novo recebe automaticamente o `idUsuario` do usuario logado;
+- usuarios com cursos ativos nao podem ser excluidos;
+- ao excluir um usuario, os cursos inativos vinculados a ele sao removidos;
+- ao cancelar um curso sem inscritos, o registro e excluido;
+- como o modulo de inscricoes ainda nao existe no TP1, a verificacao de inscritos permanece preparada para o TP2.
+
+## 7. Compilacao e execucao
+
+Exemplo de compilacao:
+
+```powershell
+javac -encoding UTF-8 -d out (Get-ChildItem -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+```
+
+Exemplo de execucao:
+
+```powershell
+java -cp out Main
+```
+
+## 8. Evidencias que devem aparecer no video
+
+- cadastro de usuario;
+- login;
+- recuperacao de senha;
+- criacao de curso;
+- listagem de cursos;
+- alteracao de curso;
+- exclusao de usuario com validacao de cursos ativos.
+
+## 9. Checklist
+
+Ha um CRUD de usuarios (que estende a classe ArquivoIndexado, acrescentando Tabelas Hash Extensiveis e Arvores B+ como indices diretos e indiretos conforme necessidade) que funciona corretamente?  
+Resposta: Sim. `ArquivoUsuarios` estende `ArquivoIndexado<Usuario>`, usa persistencia em arquivo e mantem indice indireto por e-mail. O indice direto por ID para endereco e mantido na base generica.
+
+Ha um CRUD de cursos (que estende a classe ArquivoIndexado, acrescentando Tabelas Hash Extensiveis e Arvores B+ como indices diretos e indiretos conforme necessidade) que funciona corretamente?  
+Resposta: Sim. `ArquivoCursos` estende `ArquivoIndexado<Curso>` e mantem indice por codigo, indice por nome e indice relacional `idUsuario -> idCurso`.
+
+Os cursos estao vinculados aos usuarios usando o idUsuario como chave estrangeira?  
 Resposta: Sim.
 
-Há uma árvore B+ para relacionamento 1:N?  
-Resposta: Não. O relacionamento foi implementado utilizando estrutura em memória.
+Ha uma arvore B+ que registre o relacionamento 1:N entre usuarios e cursos?  
+Resposta: Sim. O relacionamento e mantido em `dados/usuarioCurso.idx`.
+
+Ha um CRUD de usuarios (que estende a classe ArquivoIndexado, acrescentando Tabelas Hash Extensiveis e Arvores B+ como indices diretos e indiretos conforme necessidade)?  
+Resposta: Sim.
 
 O trabalho compila corretamente?  
 Resposta: Sim.
 
-O trabalho está funcionando sem erros?  
+O trabalho esta completo e funcionando sem erros de execucao?  
+Resposta: Sim para o escopo do TP1. O modulo de inscricoes permanece fora do escopo e esta sinalizado no sistema para o TP2.
+
+O trabalho e original e nao a copia de um trabalho de outro grupo?  
 Resposta: Sim.
 
-O trabalho é original?  
-Resposta: Sim.
-
----
-
-## 8. Observações
-
-O sistema foi desenvolvido seguindo o padrão MVC, separando responsabilidades entre dados, lógica e interface.
-
-As senhas são armazenadas utilizando hash SHA-256.
-
-O código compartilhável dos cursos é gerado automaticamente.
-
-Nesta versão, foi utilizada uma abordagem simplificada em memória para facilitar o desenvolvimento inicial. A substituição por estruturas como ArquivoIndexado, Hash extensível e Árvore B+ pode ser realizada em versões futuras.
-
----
-
-## 9. Evidências de Execução
+## 10. Evidências de Execução
 
 #### Cadastro de Usuário
 
@@ -171,8 +227,6 @@ Nesta versão, foi utilizada uma abordagem simplificada em memória para facilit
 
 <img src="/public/tela_encerrar_inscricoes_e_deletar_curso.jpg">
 
----
+## 11. Video
 
-## 10. Vídeo
-
-[link do video]
+[Link ou Video]
