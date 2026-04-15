@@ -13,9 +13,9 @@ public class ControleUsuario {
     private final ArquivoCursos arqCursos;
     private final VisaoUsuario visao;
 
-    public ControleUsuario() {
+    public ControleUsuario(ArquivoCursos arqCursos) {
         this.arqUsuarios = new ArquivoUsuarios();
-        this.arqCursos = new ArquivoCursos();
+        this.arqCursos = arqCursos;
         this.visao = new VisaoUsuario();
     }
 
@@ -90,7 +90,7 @@ public class ControleUsuario {
         usuario.setHashSenha(HashSenha.hash(novaSenha)); //atualiza o hash da senha
 
         if(arqUsuarios.update(usuario)){
-            System.out.println("SEnha atualizada com sucesso!");
+            System.out.println("Senha atualizada com sucesso!");
         }else{
             System.out.println("Ocorreu um erro ao atualizar a nova senha.");
         }

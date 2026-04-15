@@ -6,8 +6,8 @@ import estruturas.ArvoreBMais;
 import estruturas.TabelaHashExtensivel;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
@@ -23,9 +23,9 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
     public ArquivoCursos() {
         super(ARQ_DADOS, ARQ_INDICE_DIRETO, Curso::new);
-        indiceCodigo = new TabelaHashExtensivel<>(ARQ_INDICE_CODIGO);
-        indiceUsuarioCurso = new ArvoreBMais<>(ARQ_REL_USUARIO_CURSO);
-        indiceNome = new ArvoreBMais<>(ARQ_INDICE_NOME);
+        indiceCodigo = new TabelaHashExtensivel<>(ARQ_INDICE_CODIGO, TabelaHashExtensivel.Tipo.STRING_INT);
+        indiceUsuarioCurso = new ArvoreBMais<>(ARQ_REL_USUARIO_CURSO, ArvoreBMais.Tipo.INT_INT);
+        indiceNome = new ArvoreBMais<>(ARQ_INDICE_NOME, ArvoreBMais.Tipo.STRING_INT);
         reconstruirIndices();
     }
 
@@ -126,17 +126,27 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
     public List<Curso> listarPorUsuario(int idUsuario) {
         List<Curso> cursos = new ArrayList<>();
-        ArrayList<Integer> ids = indiceUsuarioCurso.read(idUsuario);
+        ArrayList<Integer> idsDoUsuario = indiceUsuarioCurso.read(idUsuario);
 
-        for (Integer id : ids) {
-            Curso curso = read(id);
-
-            if (curso != null) {
-                cursos.add(curso);
-            }
+        if (idsDoUsuario.isEmpty()) {
+            return cursos;
         }
 
-        cursos.sort(Comparator.comparing(curso -> texto(curso.getNome()), String.CASE_INSENSITIVE_ORDER));
+        Map<String, ArrayList<Integer>> nomesOrdenados = indiceNome.snapshot();
+
+        for (ArrayList<Integer> idsPorNome : nomesOrdenados.values()) {
+            for (Integer id : idsPorNome) {
+                if (!idsDoUsuario.contains(id)) {
+                    continue;
+                }
+
+                Curso curso = read(id);
+
+                if (curso != null) {
+                    cursos.add(curso);
+                }
+            }
+        }
         return cursos;
     }
 
@@ -203,9 +213,5 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
         }
 
         return codigo.trim();
-    }
-
-    private String texto(String valor) {
-        return valor == null ? "" : valor;
     }
 }

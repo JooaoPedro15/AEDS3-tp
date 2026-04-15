@@ -29,9 +29,4 @@ public final class GeradorCodigo {
 
         return codigo.toString();
     }
-
-    // Compatibilidade com implementacao anterior do grupo.
-    public static String gerarCodigo() {
-        return gerar();
-    }
 }

@@ -95,15 +95,6 @@ public class Usuario implements Registro {
         this.hashRespostaSecreta = hashRespostaSecreta;
     }
 
-    // Compatibilidade com o nome antigo.
-    public String getRespostaSecreta() {
-        return hashRespostaSecreta;
-    }
-
-    // Compatibilidade com o nome antigo.
-    public void setRespostaSecreta(String respostaSecreta) {
-        this.hashRespostaSecreta = respostaSecreta;
-    }
 
     @Override
     public byte[] toByteArray() throws IOException {

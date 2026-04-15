@@ -59,7 +59,7 @@ O projeto segue o padrao MVC, separando entidades, persistencia, controle e visa
 
 Relacao implementada:
 
-## 4. Modelagem de Dados
+## 3. Modelagem de Dados
 
 Usuario (1) -------- (N) Curso
 

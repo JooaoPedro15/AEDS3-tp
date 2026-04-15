@@ -16,7 +16,7 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
 
     public ArquivoUsuarios() {
         super(ARQ_DADOS, ARQ_INDICE_DIRETO, Usuario::new);
-        indiceEmail = new TabelaHashExtensivel<>(ARQ_INDICE_EMAIL);
+        indiceEmail = new TabelaHashExtensivel<>(ARQ_INDICE_EMAIL, TabelaHashExtensivel.Tipo.STRING_INT);
         reconstruirIndices();
     }
 
@@ -46,10 +46,6 @@ public class ArquivoUsuarios extends ArquivoIndexado<Usuario> {
         return read(id);
     }
 
-    // Compatibilidade com chamadas antigas.
-    public Usuario buscarEmail(String email) {
-        return buscarPorEmail(email);
-    }
 
     @Override
     public boolean update(Usuario usuario) {

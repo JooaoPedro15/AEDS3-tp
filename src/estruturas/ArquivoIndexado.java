@@ -40,7 +40,7 @@ public class ArquivoIndexado<T extends Registro> implements AutoCloseable {
                 arquivo.writeLong(-1L);
             }
 
-            this.indiceDireto = new TabelaHashExtensivel<>(caminhoIndiceDireto);
+            this.indiceDireto = new TabelaHashExtensivel<>(caminhoIndiceDireto, TabelaHashExtensivel.Tipo.INT_LONG);
             reconstruirIndiceDireto();
         } catch (IOException e) {
             throw new RuntimeException("Erro ao abrir arquivo de dados: " + caminhoArquivo, e);

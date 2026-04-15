@@ -14,8 +14,8 @@ public class ControleCurso {
     private final ArquivoCursos arq;
     private final VisaoCurso visao;
 
-    public ControleCurso() {
-        this.arq = new ArquivoCursos();
+    public ControleCurso(ArquivoCursos arq) {
+        this.arq = arq;
         this.visao = new VisaoCurso();
     }
 
@@ -179,25 +179,23 @@ public class ControleCurso {
             return;
         }
 
-        boolean temInscritos = verificarInscritos(curso.getId()); //verifica se tem inscritos no curso
+        boolean temInscritos = verificarInscritos(curso.getId());
 
-        if(temInscritos){
-            //se sim, muda estado para cancelado
+        if (temInscritos) {
             curso.setEstado(3);
             arq.update(curso);
             System.out.println("Ha inscritos no curso, o curso foi cancelado!");
-        }else{
-            //caos contrario exclui o registro
+        } else {
             boolean excluiu = arq.delete(curso.getId());
-            if(excluiu){
+            if (excluiu) {
                 System.out.println("Curso foi excluido com sucesso!");
-            }else{
+            } else {
                 System.out.println("Ocorreu um erro ao tentar excluir o curso!");
             }
         }
     }
 
-    private boolean verificarInscritos(int id){
+    private boolean verificarInscritos(int id) {
         return false;
     }
 
