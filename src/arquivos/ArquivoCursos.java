@@ -4,6 +4,8 @@ import entidades.Curso;
 import estruturas.ArquivoIndexado;
 import estruturas.ArvoreBMais;
 import estruturas.TabelaHashExtensivel;
+import indice.IndiceInvertidoCursos;
+import indice.ResultadoBuscaCurso;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,15 +19,21 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
     private static final String ARQ_INDICE_CODIGO = "dados/cursoCodigo.hash";
     private static final String ARQ_INDICE_NOME = "dados/cursosNome.idx";
 
+    // Arquivos do indice invertido dos nomes dos cursos (TP3).
+    private static final String ARQ_INV_DICIONARIO = "dados/cursos.dicionario.listainv.db";
+    private static final String ARQ_INV_BLOCOS = "dados/cursos.blocos.listainv.db";
+
     private final TabelaHashExtensivel<String, Integer> indiceCodigo;
     private final ArvoreBMais<Integer, Integer> indiceUsuarioCurso;
     private final ArvoreBMais<String, Integer> indiceNome;
+    private final IndiceInvertidoCursos indiceInvertido;
 
     public ArquivoCursos() {
         super(ARQ_DADOS, ARQ_INDICE_DIRETO, Curso::new);
         indiceCodigo = new TabelaHashExtensivel<>(ARQ_INDICE_CODIGO, TabelaHashExtensivel.Tipo.STRING_INT);
         indiceUsuarioCurso = new ArvoreBMais<>(ARQ_REL_USUARIO_CURSO, ArvoreBMais.Tipo.INT_INT);
         indiceNome = new ArvoreBMais<>(ARQ_INDICE_NOME, ArvoreBMais.Tipo.STRING_INT);
+        indiceInvertido = new IndiceInvertidoCursos(ARQ_INV_DICIONARIO, ARQ_INV_BLOCOS);
         reconstruirIndices();
     }
 
@@ -43,6 +51,7 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
         indiceUsuarioCurso.create(curso.getIdUsuario(), id);
         indiceNome.create(curso.getNome(), id);
+        indiceInvertido.inserir(curso);
 
         if (!codigo.isEmpty()) {
             indiceCodigo.upsert(codigo, id);
@@ -82,6 +91,7 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
         if (!antigo.getNome().equals(curso.getNome())) {
             indiceNome.delete(antigo.getNome(), antigo.getId());
             indiceNome.create(curso.getNome(), curso.getId());
+            indiceInvertido.atualizar(antigo, curso);
         }
 
         String codigoAntigo = normalizarCodigo(antigo.getCodigo());
@@ -115,6 +125,7 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
 
         indiceUsuarioCurso.delete(curso.getIdUsuario(), id);
         indiceNome.delete(curso.getNome(), id);
+        indiceInvertido.remover(curso);
 
         String codigo = normalizarCodigo(curso.getCodigo());
         if (!codigo.isEmpty()) {
@@ -191,6 +202,29 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
         return id == null ? null : read(id);
     }
 
+    /**
+     * Busca cursos por palavras-chave usando o indice invertido.
+     * Aplica o mesmo tratamento de termos (minusculas, sem acento,
+     * sem stop words), calcula TF*IDF e retorna os cursos ordenados
+     * por relevancia. Cada resultado ja vem com o curso carregado.
+     */
+    public List<ResultadoBuscaCurso> buscarPorPalavras(String consulta) {
+        List<ResultadoBuscaCurso> resultados = indiceInvertido.buscar(consulta);
+        List<ResultadoBuscaCurso> comCurso = new ArrayList<>();
+
+        for (ResultadoBuscaCurso resultado : resultados) {
+            Curso curso = read(resultado.getIdCurso());
+
+            // Ignora ids que por algum motivo nao existam mais.
+            if (curso != null) {
+                resultado.setCurso(curso);
+                comCurso.add(resultado);
+            }
+        }
+
+        return comCurso;
+    }
+
     private void reconstruirIndices() {
         indiceCodigo.clear();
         indiceUsuarioCurso.clear();
@@ -199,6 +233,7 @@ public class ArquivoCursos extends ArquivoIndexado<Curso> {
         for (Curso curso : super.readAll()) {
             indiceUsuarioCurso.create(curso.getIdUsuario(), curso.getId());
             indiceNome.create(curso.getNome(), curso.getId());
+            indiceInvertido.inserir(curso);
 
             String codigo = normalizarCodigo(curso.getCodigo());
             if (!codigo.isEmpty()) {

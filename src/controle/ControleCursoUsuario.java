@@ -6,6 +6,7 @@ import arquivos.ArquivoUsuarios;
 import entidades.Curso;
 import entidades.CursoUsuario;
 import entidades.Usuario;
+import indice.ResultadoBuscaCurso;
 import utils.Entrada;
 
 import java.io.FileOutputStream;
@@ -104,9 +105,7 @@ public class ControleCursoUsuario {
             }
 
             if (op.equalsIgnoreCase("B")) {
-                System.out.println(
-                        "\nBusca por palavra-chave sera implementada no TP3."
-                );
+                buscarCursoPorPalavras(logado);
                 continue;
             }
 
@@ -149,6 +148,87 @@ public class ControleCursoUsuario {
         } catch (Exception e) {
             System.out.println(
                     "\nErro ao buscar curso!\n"
+                    + e.getMessage()
+            );
+        }
+    }
+
+    // Busca cursos por palavras-chave usando o indice invertido (TP3).
+    // Mostra os resultados ordenados por relevancia (TF*IDF) e permite
+    // abrir um curso para inscricao, igual a busca por codigo.
+    private void buscarCursoPorPalavras(Usuario logado) {
+        System.out.println("\nEntrePares 1.0");
+        System.out.println("--------------");
+        System.out.println("> Inicio > Minhas inscricoes > Buscar curso por palavras-chave");
+        System.out.print("\nDigite uma ou mais palavras do nome do curso: ");
+
+        String consulta = Entrada.SCANNER.nextLine().trim();
+
+        if (consulta.isEmpty()) {
+            System.out.println("\nDigite ao menos uma palavra para buscar.");
+            return;
+        }
+
+        try {
+            List<ResultadoBuscaCurso> resultados =
+                    arqCursos.buscarPorPalavras(consulta);
+
+            if (resultados.isEmpty()) {
+                System.out.println("\nNenhum curso encontrado para essa busca.");
+                return;
+            }
+
+            while (true) {
+                System.out.println("\nEntrePares 1.0");
+                System.out.println("--------------");
+                System.out.println(
+                        "> Inicio > Minhas inscricoes > Resultados da busca"
+                );
+                System.out.println("\nRESULTADOS (ordenados por relevancia)\n");
+
+                for (int i = 0; i < resultados.size(); i++) {
+                    Curso curso = resultados.get(i).getCurso();
+
+                    System.out.println(
+                            "(" + (i + 1) + ") "
+                            + curso.getNome()
+                            + " - "
+                            + curso.getDataInicio()
+                            + sufixoEstado(curso)
+                    );
+                }
+
+                System.out.println("\n(R) Retornar ao menu anterior");
+                System.out.print("\nOpcao: ");
+
+                String op = Entrada.SCANNER.nextLine().trim();
+
+                if (op.equalsIgnoreCase("R")) {
+                    return;
+                }
+
+                Integer indice = parseInteiro(op);
+
+                if (indice != null
+                        && indice >= 1
+                        && indice <= resultados.size()) {
+                    Curso escolhido = resultados.get(indice - 1).getCurso();
+
+                    visualizarCursoParaInscricao(
+                            logado,
+                            escolhido,
+                            "> Inicio > Minhas inscricoes > "
+                            + escolhido.getNome()
+                    );
+                    continue;
+                }
+
+                System.out.println("\nOpcao invalida.");
+            }
+
+        } catch (Exception e) {
+            System.out.println(
+                    "\nErro ao buscar curso por palavras-chave!\n"
                     + e.getMessage()
             );
         }
