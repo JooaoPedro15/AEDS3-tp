@@ -344,13 +344,24 @@ public class ControleCursoUsuario {
             while (true) {
                 mostrarDadosCurso(curso, caminho);
 
-                System.out.println("\n(A) Fazer minha inscricao no curso");
+                // So cursos abertos (ATIVO) aceitam inscricao; nos demais
+                // estados a opcao de inscricao nem aparece no menu.
+                boolean aberto = curso.getEstado() == Curso.ATIVO;
+
+                if (aberto) {
+                    System.out.println("\n(A) Fazer minha inscricao no curso");
+                } else {
+                    System.out.println(
+                            "\nEste curso nao esta aberto para inscricoes."
+                    );
+                }
+
                 System.out.println("\n(R) Retornar ao menu anterior");
                 System.out.print("\nOpcao: ");
 
                 String op = Entrada.SCANNER.nextLine().trim();
 
-                if (op.equalsIgnoreCase("A")) {
+                if (aberto && op.equalsIgnoreCase("A")) {
                     boolean ok =
                             inscreverUsuario(curso.getId(), logado.getId());
 
